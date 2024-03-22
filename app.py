@@ -19,7 +19,7 @@ from model.membro_view_model import MembroViewModel
 
 
 
-info = Info(title="API para criação de uma árvore genealógica", version="1.0.0")
+info = Info(title="API para criação de um MVP de Árvore Genealógica - Sprint-01", version="1.0.0")
 app = OpenAPI(__name__, info=info)
 CORS(app)
 
