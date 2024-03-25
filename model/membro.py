@@ -39,3 +39,6 @@ class Membro(Base):
         if data_insercao:
             self.data_insercao = data_insercao
 
+
+
+

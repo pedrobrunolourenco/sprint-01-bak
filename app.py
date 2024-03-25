@@ -2,7 +2,7 @@ from flask_openapi3 import OpenAPI, Info, Tag
 from flask import redirect
 from urllib.parse import unquote
 
-from schemas.membro import MembroAddSchema
+from schemas.membro import MembroAddSchema, RetornoAddMembroBaseEsquema
 from sqlalchemy.exc import IntegrityError
 
 from model import Session, Membro
@@ -23,22 +23,33 @@ info = Info(title="API para criação de um MVP de Árvore Genealógica - Sprint
 app = OpenAPI(__name__, info=info)
 CORS(app)
 
-
 # definindo tags
 home_tag = Tag(name="Documentação", description="Seleção de documentação: Swagger, Redoc ou RapiDoc")
 membro_tag = Tag(name="Membro", description="Adição, Edição, visualização e remoção de membros à base")
 
-def  busca_nome_por_id(id) -> str :
-    session = Session()
-    membro = session.query(Membro).filter(Membro.id == id).first()
-    result = "Informar"
-    if membro != None and membro.id > 0 :
-      result = membro.nome
-    return result
+# def  verifica_se_ja_existe_membro_base(nome: str) -> str :
+#     session = Session()
+#     membro = session.query(Membro).filter(Membro.nome.lower() == nome.lower() and Membro.id_base==0).first()
+#     result = False
+#     if membro != None and membro.id > 0 :
+#       result = True
+#     return False
 
-def  busca_membros_comuns(id_base) -> List[MembroViewModel] :
+
+def busca_nome_por_id(id) -> str :
+    result = "Não Informado"
+    if id > 0 :
+        session = Session()
+        membro = session.query(Membro).filter(Membro.id == id).first()
+        if membro != None and membro.id > 0 :
+            result = membro.nome
+        return result
+    else :
+        return result
+
+def busca_membros_comuns(id_base) -> List[MembroViewModel] :
     session = Session()
-    membros = session.query(Membro).filter(Membro.id_base == id_base).order_by(Membro.nivel)
+    membros = session.query(Membro).filter(Membro.id_base == id_base).order_by(Membro.nivel, Membro.nome)
     result = []
     for membro in membros:
         result.append({
@@ -53,9 +64,9 @@ def  busca_membros_comuns(id_base) -> List[MembroViewModel] :
         })
     return {"membros": result}
 
-def  busca_membros_base() -> List[MembroViewModel] :
+def busca_membros_base() -> List[MembroViewModel] :
     session = Session()
-    membros = session.query(Membro).filter(Membro.id_base == 0).order_by(Membro.nivel)
+    membros = session.query(Membro).filter(Membro.id_base == 0).order_by(Membro.nome)
     result = []
     for membro in membros:
         result.append({
@@ -69,8 +80,6 @@ def  busca_membros_base() -> List[MembroViewModel] :
         "nome_mae" : busca_nome_por_id(membro.mae),
         })
     return {"membros": result}
-
-
 
 @app.get('/', tags=[home_tag])
 def home():
@@ -86,16 +95,16 @@ def obter_membros_base():
     Retorna uma lista de representação dos membros base
     """
     try:
-        membros = busca_membros_base()        
+        membros = busca_membros_base()      
         return membros, 200
-
     except Exception as e:
         error_msg = "Não foi possível obter listagem de membros base :/"
         logger.warning(f"Erro ao listar membros base ', {error_msg}")
-        membros = busca_membros_base()        
+        return {"mesage": error_msg}, 400
+        
 
 @app.post('/membro_base', tags=[membro_tag],
-          responses={"200": ListagemMembrosSchema, "409": ErrorSchema, "400": ErrorSchema})
+          responses={"200": RetornoAddMembroBaseEsquema, "400": ErrorSchema})
 def add_membro_base(form: MembroBaseAddSchema):
     """Adiciona um novo membro à base de dados
 
@@ -108,21 +117,20 @@ def add_membro_base(form: MembroBaseAddSchema):
       pai = 0,
       mae = 0
     )
-    
+
     logger.debug(f"Adicionando membro base de nome: '{membro.nome}'")
     try:
         session = Session()
         session.add(membro)
         session.commit()
         logger.debug(f"Adicionado membro base de nome: '{membro.nome}'")
-        membros = busca_membros_base()        
-        return membros, 200
+        return {"sucesso": True}, 200
     except Exception as e:
         error_msg = "Não foi possível salvar novo membro :/"
         logger.warning(f"Erro ao adicionar membro '{membro.nome}', {error_msg}")
-        membros = busca_membros_base(membro.id_base)        
-
-
+        return {"mesage": error_msg}, 400
+        
+            
 
 @app.post('/membro_comum', tags=[membro_tag],
           responses={"200": ListagemMembrosSchema, "409": ErrorSchema, "400": ErrorSchema})
@@ -150,14 +158,10 @@ def add_membro_comum(form: MembroAddSchema):
         
 
     except Exception as e:
-        # caso um erro fora do previsto
         error_msg = "Não foi possível salvar novo membro comum :/"
         logger.warning(f"Erro ao adicionar membro comum '{membro.nome}', {error_msg}")
         membros = busca_membros_comuns(membro.id_base)        
-    
 
 
-        
 
-  
 

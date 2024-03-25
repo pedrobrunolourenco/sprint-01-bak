@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import List
 from model.membro import Membro
 from model.membro_view_model import MembroViewModel
 
@@ -21,8 +21,13 @@ class MembroBaseAddSchema(BaseModel):
 class ListagemMembrosSchema(BaseModel):
     """ Define como uma listagem de membros será retornada.
     """
-    produtos:List[MembroViewModel]
+    membros:List[MembroViewModel]
 
+class RetornoAddMembroBaseEsquema(BaseModel):
+    """ Define sucesso ou não da inclusão do membro base.
+    """
+    sucesso: bool
+    
 
 
 
