@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from model.membro import Membro
 from model.membro_view_model import MembroViewModel
+from sqlalchemy import update;
 
 
 
@@ -33,7 +34,7 @@ membro_tag = Tag(name="Membro", description="Adição, Edição, visualização 
 #     result = False
 #     if membro != None and membro.id > 0 :
 #       result = True
-#     return False
+#     return result
 
 
 def busca_nome_por_id(id) -> str :
@@ -49,7 +50,12 @@ def busca_nome_por_id(id) -> str :
 
 def busca_membros_comuns(id_base) -> List[MembroViewModel] :
     session = Session()
-    membros = session.query(Membro).filter(Membro.id_base == id_base or Membro.id == id_base).order_by(Membro.nivel, Membro.nome)
+
+    membros = session.query(Membro)\
+                .filter((Membro.id_base == id_base) | (Membro.id == id_base))\
+                .order_by(Membro.nivel, Membro.id)\
+                .all()
+
     result = []
     for membro in membros:
         result.append({
@@ -148,9 +154,9 @@ def add_membro_base(form: MembroBaseAddSchema):
         
             
 
-@app.post('/membro_comum', tags=[membro_tag],
+@app.post('/membro_comum_pai', tags=[membro_tag],
           responses={"200": ListagemMembrosSchema, "409": ErrorSchema, "400": ErrorSchema})
-def add_membro_comum(form: MembroAddSchema):
+def add_membro_comum_pai(form: MembroAddSchema):
     """Adiciona um novo membro comum à base de dados
 
     Retorna uma lista de representação dos membros comuns.
@@ -168,7 +174,13 @@ def add_membro_comum(form: MembroAddSchema):
         session = Session()
         session.add(membro)
         session.commit()
-        logger.debug(f"Adicionado membro comum de nome: '{membro.nome}'")
+
+        novo_pai = membro.id
+
+        stmt = update(Membro).where(Membro.id == form.id_origem).values(pai=novo_pai)
+        session.execute(stmt)
+        session.commit()       
+
         membros = busca_membros_comuns(membro.id_base)        
         return membros, 200
         
@@ -179,5 +191,40 @@ def add_membro_comum(form: MembroAddSchema):
         membros = busca_membros_comuns(membro.id_base)        
 
 
+@app.post('/membro_comum_mae', tags=[membro_tag],
+          responses={"200": ListagemMembrosSchema, "409": ErrorSchema, "400": ErrorSchema})
+def add_membro_comum_mae(form: MembroAddSchema):
+    """Adiciona um novo membro comum à base de dados
+
+    Retorna uma lista de representação dos membros comuns.
+    """
+    membro = Membro(
+      id_base = form.id_base,
+      nivel = form. nivel,    
+      nome = form.nome,
+      pai = form.pai,
+      mae = form.mae
+    )
+    
+    logger.debug(f"Adicionando membro comum de nome: '{membro.nome}'")
+    try:
+        session = Session()
+        session.add(membro)
+        session.commit()
+
+        nova_mae = membro.id
+
+        stmt = update(Membro).where(Membro.id == form.id_origem).values(mae=nova_mae)
+        session.execute(stmt)
+        session.commit()       
+
+        membros = busca_membros_comuns(membro.id_base)        
+        return membros, 200
+        
+
+    except Exception as e:
+        error_msg = "Não foi possível salvar novo membro comum :/"
+        logger.warning(f"Erro ao adicionar membro comum '{membro.nome}', {error_msg}")
+        membros = busca_membros_comuns(membro.id_base)        
 
 

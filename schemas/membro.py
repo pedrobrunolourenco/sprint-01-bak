@@ -11,6 +11,7 @@ class MembroAddSchema(BaseModel):
     nome: str = "Nome Completo"
     pai: int = 0
     mae: int = 0
+    id_origem: int = 0
 
 class MembroBaseAddSchema(BaseModel):
     """ Define como um novo membro base da árvore a ser inserido deve ser representado

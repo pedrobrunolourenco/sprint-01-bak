@@ -13,6 +13,7 @@ class Membro(Base):
     nome = Column(String(140))
     pai = Column(Integer)
     mae = Column(Integer)
+    
     data_insercao = Column(DateTime, default=datetime.now())
 
 
