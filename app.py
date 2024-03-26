@@ -2,7 +2,7 @@ from flask_openapi3 import OpenAPI, Info, Tag
 from flask import redirect
 from urllib.parse import unquote
 
-from schemas.membro import MembroAddSchema, RetornoAddMembroBaseEsquema
+from schemas.membro import MembroAddSchema, MembroComumGetSchema, RetornoAddMembroBaseEsquema
 from sqlalchemy.exc import IntegrityError
 
 from model import Session, Membro
@@ -49,7 +49,7 @@ def busca_nome_por_id(id) -> str :
 
 def busca_membros_comuns(id_base) -> List[MembroViewModel] :
     session = Session()
-    membros = session.query(Membro).filter(Membro.id_base == id_base).order_by(Membro.nivel, Membro.nome)
+    membros = session.query(Membro).filter(Membro.id_base == id_base or Membro.id == id_base).order_by(Membro.nivel, Membro.nome)
     result = []
     for membro in membros:
         result.append({
@@ -101,6 +101,22 @@ def obter_membros_base():
         error_msg = "Não foi possível obter listagem de membros base :/"
         logger.warning(f"Erro ao listar membros base ', {error_msg}")
         return {"mesage": error_msg}, 400
+    
+@app.get('/membro_comun', tags=[membro_tag],
+          responses={"200": ListagemMembrosSchema, "409": ErrorSchema, "400": ErrorSchema})
+def obter_membros_comuns(query: MembroComumGetSchema):
+    """Obtém uma lista de membros relacionados a um membro base
+
+    Retorna uma lista de representação dos membros 
+    """
+    try:
+        membros = busca_membros_comuns(query.id_base)      
+        return membros, 200
+    except Exception as e:
+        error_msg = "Não foi possível obter listagem de membros :/"
+        logger.warning(f"Erro ao listar membros base ', {error_msg}")
+        return {"mesage": error_msg}, 400
+
         
 
 @app.post('/membro_base', tags=[membro_tag],

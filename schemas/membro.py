@@ -18,6 +18,11 @@ class MembroBaseAddSchema(BaseModel):
     nome: str = "Nome Completo"
 
 
+class MembroComumGetSchema(BaseModel):
+    """ Define o filtro dos membros baseado no membro base
+    """
+    id_base: int = 1
+
 class ListagemMembrosSchema(BaseModel):
     """ Define como uma listagem de membros será retornada.
     """
