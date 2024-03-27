@@ -29,7 +29,7 @@ class ListagemMembrosSchema(BaseModel):
     """
     membros:List[MembroViewModel]
 
-class RetornoAddMembroBaseEsquema(BaseModel):
+class RetornoPostEsquema(BaseModel):
     """ Define sucesso ou não da inclusão do membro base.
     """
     sucesso: bool

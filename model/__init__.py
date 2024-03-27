@@ -6,6 +6,8 @@ import os
 # importando os elementos definidos no modelo
 from model.base import Base
 from model.membro import Membro
+from model.mae_filho import MaeFilho
+from model.pai_filho import PaiFilho
 
 db_path = "database/"
 # Verifica se o diretorio não existe
