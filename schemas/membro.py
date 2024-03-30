@@ -42,6 +42,7 @@ class RetornoPostEsquema(BaseModel):
     """ Define sucesso ou não da inclusão do membro base.
     """
     sucesso: bool
+    mensagem: str
     
 
 

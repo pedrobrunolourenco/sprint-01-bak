@@ -163,7 +163,7 @@ def obter_por_id(query: MembroGetSchema):
         return {"mesage": error_msg}, 400
     
 @app.get('/membro_comun', tags=[membro_tag],
-          responses={"200": ListagemMembrosSchema, "409": ErrorSchema, "400": ErrorSchema})
+          responses={"200": ListagemMembrosSchema, "404": ErrorSchema, "400": ErrorSchema})
 def obter_membros_comuns(query: MembroComumGetSchema):
     """Obtém uma lista de membros relacionados a um membro base
 
@@ -179,7 +179,7 @@ def obter_membros_comuns(query: MembroComumGetSchema):
 
 
 @app.post('/membro_base', tags=[membro_tag],
-          responses={"200": RetornoPostEsquema, "400": ErrorSchema})
+          responses={"200": RetornoPostEsquema, "400": RetornoPostEsquema})
 def add_membro_base(form: MembroBaseAddSchema):
     """Adiciona um novo membro à base de dados
 
@@ -193,25 +193,22 @@ def add_membro_base(form: MembroBaseAddSchema):
       mae = 0
     )
 
-    logger.debug(f"Adicionando membro base de nome: '{membro.nome}'")
     try:
-        jaexiste = verifica_se_ja_existe_membro_base(membro.nome)
-        logger.warning(jaexiste)
-        if jaexiste == True :
-            logger.debug("")
-            error_msg = "Membro base já existe na base de dados :/"
-            return {"mesage": error_msg}, 400
-        else :            
-            session = Session()
-            session.add(membro)
-            session.commit()
-            logger.debug(f"Adicionado membro base de nome: '{membro.nome}'")
-            return {"sucesso": True}, 200
+        logger.warning(membro.nome)
+        if membro.nome != "" :
+            jaexiste = verifica_se_ja_existe_membro_base(membro.nome)
+            if jaexiste == True :
+                return {"sucesso": False, "mensagem": "Membro já existe na base"}, 404
+            else :            
+                session = Session()
+                session.add(membro)
+                session.commit()
+                return {"sucesso": True, "mensagem": "Membro base cadastrado com sucesso"}, 200
+        else :
+            return {"sucesso": False, "mensagem": "Necessário informar o nome"}, 400
 
     except Exception as e:
-        error_msg = "Não foi possível salvar novo membro :/"
-        logger.warning(f"Erro ao adicionar membro '{membro.nome}', {error_msg}")
-        return {"mesage": error_msg}, 400
+            return {"sucesso": False, "mensagem": "Erro ao cadastrar membro base"}, 400
        
           
 
