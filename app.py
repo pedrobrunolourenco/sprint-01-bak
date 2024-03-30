@@ -4,7 +4,7 @@ from urllib.parse import unquote
 
 from model.mae_filho import MaeFilho
 from model.pai_filho import PaiFilho
-from schemas.membro import MembroAddSchema, MembroComumGetSchema, RetornoPostEsquema
+from schemas.membro import MembroAddSchema, MembroComumGetSchema, MembroGetSchema, RetornoMembroSchema, RetornoPostEsquema
 from sqlalchemy.exc import IntegrityError
 
 from model import Session, Membro
@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from model.membro import Membro
 from model.membro_view_model import MembroViewModel
-from sqlalchemy import update;
+from sqlalchemy import func, update;
 
 
 
@@ -30,22 +30,18 @@ CORS(app)
 home_tag = Tag(name="Documentação", description="Seleção de documentação: Swagger, Redoc ou RapiDoc")
 membro_tag = Tag(name="Membro", description="Adição, Edição, visualização e remoção de membros à base")
 
-# def  verifica_se_ja_existe_membro_base(nome: str) -> str :
-#     session = Session()
-#     membro = session.query(Membro).filter(Membro.nome.lower() == nome.lower() and Membro.id_base==0).first()
-#     result = False
-#     if membro != None and membro.id > 0 :
-#       result = True
-#     return result
-
-def busca_pai_por_id_array(id, pais ) -> str :
-    result = "Informe o Pai"
-    if id > 0 :
-        for pai in pais:
-            if pai.id_filho == id :
-                result = pai.nome_pai
-                break
-    return result            
+def  verifica_se_ja_existe_membro_base(nome: str) -> str :
+    session = Session()
+    try :
+        membro = session.query(Membro).filter(func.lower(Membro.nome) == nome.lower(), Membro.id_base == 0).first()
+        if membro :
+          result = True
+        else :
+          result = False          
+        return result
+    except Exception as e:
+        logger.warning(e)
+            
 
 def busca_pai_por_id(id) -> str :
     result = "Informe o Pai"
@@ -69,53 +65,52 @@ def busca_mae_por_id(id) -> str :
     else :
         return result
 
-
 def busca_membros_comuns(id_base) -> List[MembroViewModel] :
-    session = Session()
-
-    membros = session.query(Membro)\
-                .filter((Membro.id_base == id_base) | (Membro.id == id_base))\
-                .order_by(Membro.nivel, Membro.id)\
-                .all()
-    
-    pais = session.query(PaiFilho)\
-                .filter(PaiFilho.id_base == id_base)\
-                .all()
-
-    maes = session.query(MaeFilho)\
-                .filter(MaeFilho.id_base == id_base)\
-                .all()
+    session = Session()    
+    membros = session.query(Membro, PaiFilho, MaeFilho)\
+                    .outerjoin(PaiFilho, Membro.id == PaiFilho.id_filho)\
+                    .outerjoin(MaeFilho, Membro.id == MaeFilho.id_filho)\
+                    .filter((Membro.id_base == id_base) | (Membro.id == id_base))\
+                    .order_by(Membro.nivel, Membro.id)\
+                    .all()
 
     result = []
-    for membro in membros:
+    for membro, pai, mae in membros:
         result.append({
-        "id": membro.id,    
-        "id_base" : membro.id_base,
-        "nivel" : membro.nivel,
-        "nome" : membro.nome,
-        "pai" : membro.pai,
-        "nome_pai" : busca_pai_por_id_array(membro.id, pais ), ##busca_pai_por_id(membro.id),
-        "mae" : membro.mae,
-        "nome_mae" : "mae" ##busca_mae_por_id(membro.id),
+            "id": membro.id,    
+            "id_base": membro.id_base,
+            "nivel": membro.nivel,
+            "nome": membro.nome,
+            "pai": membro.pai,
+            "nome_pai": pai.nome_pai if pai else "Informe o Pai",
+            "mae": membro.mae,
+            "nome_mae": mae.nome_mae if mae else "Informe a Mãe"
         })
     return {"membros": result}
 
 def busca_membros_base() -> List[MembroViewModel] :
     session = Session()
-    membros = session.query(Membro).filter(Membro.id_base == 0).order_by(Membro.nome)
+    membros = session.query(Membro, PaiFilho, MaeFilho)\
+                    .outerjoin(PaiFilho, Membro.id == PaiFilho.id_filho)\
+                    .outerjoin(MaeFilho, Membro.id == MaeFilho.id_filho)\
+                    .filter(Membro.id_base == 0)\
+                    .order_by(Membro.nivel, Membro.id)\
+                    .all()
+
     result = []
-    for membro in membros:
+    for membro, pai, mae in membros:
         result.append({
-        "id": membro.id,    
-        "id_base" : membro.id_base,
-        "nivel" : membro.nivel,
-        "nome" : membro.nome,
-        "pai" : membro.pai,
-        "nome_pai" : busca_pai_por_id(membro.id),
-        "mae" : membro.mae,
-        "nome_mae" : busca_mae_por_id(membro.id),
+            "id": membro.id,    
+            "id_base": membro.id_base,
+            "nivel": membro.nivel,
+            "nome": membro.nome,
+            "pai": membro.pai,
+            "nome_pai": pai.nome_pai if pai else "Informe o Pai",
+            "mae": membro.mae,
+            "nome_mae": mae.nome_mae if mae else "Informe a Mãe"
         })
     return {"membros": result}
+
 
 @app.get('/', tags=[home_tag])
 def home():
@@ -136,6 +131,35 @@ def obter_membros_base():
     except Exception as e:
         error_msg = "Não foi possível obter listagem de membros base :/"
         logger.warning(f"Erro ao listar membros base ', {error_msg}")
+        return {"mesage": error_msg}, 400
+    
+@app.get('/membro_por_id', tags=[membro_tag],
+          responses={"200": RetornoMembroSchema, "409": ErrorSchema, "400": ErrorSchema, "404": ErrorSchema})
+def obter_por_id(query: MembroGetSchema):
+    """Obtém um membro 
+
+    Retorna uma representação de um membro
+    """
+    try:
+        session = Session()
+        membro = session.query(Membro).filter(Membro.id == query.id).first()
+        if membro :
+            retorno = MembroViewModel(id=membro.id, id_base=membro.id_base, nivel=membro.nivel, nome=membro.nome, pai=membro.pai, nome_pai="", mae=membro.mae, nome_mae="")
+            if retorno.pai > 0 :
+                retorno.nome_pai = session.query(Membro).filter(Membro.id == retorno.pai).first().nome
+
+            if retorno.mae > 0 :               
+                retorno.nome_mae = session.query(Membro).filter(Membro.id == retorno.mae).first().nome
+
+            membro_dict = retorno.dict()
+            return {"membro": membro_dict }
+        else :
+          error_msg = "Membro não localizado :/"
+          return {"mesage": error_msg}, 404
+        
+    except Exception as e:
+        error_msg = "Não foi possível obter um membro por id:/"
+        logger.warning(f"Erro ao buscar membro por id ', {error_msg}")
         return {"mesage": error_msg}, 400
     
 @app.get('/membro_comun', tags=[membro_tag],
@@ -171,18 +195,25 @@ def add_membro_base(form: MembroBaseAddSchema):
 
     logger.debug(f"Adicionando membro base de nome: '{membro.nome}'")
     try:
-        session = Session()
-        session.add(membro)
-        session.commit()
-        logger.debug(f"Adicionado membro base de nome: '{membro.nome}'")
-        return {"sucesso": True}, 200
+        jaexiste = verifica_se_ja_existe_membro_base(membro.nome)
+        logger.warning(jaexiste)
+        if jaexiste == True :
+            logger.debug("")
+            error_msg = "Membro base já existe na base de dados :/"
+            return {"mesage": error_msg}, 400
+        else :            
+            session = Session()
+            session.add(membro)
+            session.commit()
+            logger.debug(f"Adicionado membro base de nome: '{membro.nome}'")
+            return {"sucesso": True}, 200
 
     except Exception as e:
         error_msg = "Não foi possível salvar novo membro :/"
         logger.warning(f"Erro ao adicionar membro '{membro.nome}', {error_msg}")
         return {"mesage": error_msg}, 400
-        
-            
+       
+          
 
 @app.post('/membro_comum_pai', tags=[membro_tag],
           responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
