@@ -13,6 +13,21 @@ class MembroAddSchema(BaseModel):
     mae: int = 0
     id_origem: int = 0
 
+class MembroAlteraPaiSchema(BaseModel):
+    """ Define como um membro da árvore a ser alterado deve ser representado
+    """
+    id_pai: int = 0
+    id_filho: int = 0
+    nome: str = "Nome do pai"
+
+class MembroAlteraMaeSchema(BaseModel):
+    """ Define como um membro da árvore a ser alterado deve ser representado
+    """
+    id_mae: int = 0
+    id_filho: int = 0
+    nome: str = "Nome da Mãe"
+
+
 class MembroBaseAddSchema(BaseModel):
     """ Define como um novo membro base da árvore a ser inserido deve ser representado
     """
@@ -39,11 +54,10 @@ class ListagemMembrosSchema(BaseModel):
     membros:List[MembroViewModel]
 
 class RetornoPostEsquema(BaseModel):
-    """ Define sucesso ou não da inclusão do membro base.
+    """ Define sucesso ou não em um post.
     """
     sucesso: bool
     mensagem: str
     
-
 
 

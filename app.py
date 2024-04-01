@@ -4,7 +4,7 @@ from urllib.parse import unquote
 
 from model.mae_filho import MaeFilho
 from model.pai_filho import PaiFilho
-from schemas.membro import MembroAddSchema, MembroComumGetSchema, MembroGetSchema, RetornoMembroSchema, RetornoPostEsquema
+from schemas.membro import MembroAddSchema, MembroAlteraMaeSchema, MembroAlteraPaiSchema, MembroComumGetSchema, MembroGetSchema, RetornoMembroSchema, RetornoPostEsquema
 from sqlalchemy.exc import IntegrityError
 
 from model import Session, Membro
@@ -131,7 +131,7 @@ def obter_membros_base():
     except Exception as e:
         error_msg = "Não foi possível obter listagem de membros base :/"
         logger.warning(f"Erro ao listar membros base ', {error_msg}")
-        return {"mesage": error_msg}, 400
+        return {"message": error_msg}, 400
     
 @app.get('/membro_por_id', tags=[membro_tag],
           responses={"200": RetornoMembroSchema, "409": ErrorSchema, "400": ErrorSchema, "404": ErrorSchema})
@@ -155,12 +155,12 @@ def obter_por_id(query: MembroGetSchema):
             return {"membro": membro_dict }
         else :
           error_msg = "Membro não localizado :/"
-          return {"mesage": error_msg}, 404
+          return {"message": error_msg}, 200
         
     except Exception as e:
         error_msg = "Não foi possível obter um membro por id:/"
         logger.warning(f"Erro ao buscar membro por id ', {error_msg}")
-        return {"mesage": error_msg}, 400
+        return {"message": error_msg}, 400
     
 @app.get('/membro_comun', tags=[membro_tag],
           responses={"200": ListagemMembrosSchema, "404": ErrorSchema, "400": ErrorSchema})
@@ -175,7 +175,7 @@ def obter_membros_comuns(query: MembroComumGetSchema):
     except Exception as e:
         error_msg = "Não foi possível obter listagem de membros :/"
         logger.warning(f"Erro ao listar membros base ', {error_msg}")
-        return {"mesage": error_msg}, 400
+        return {"message": error_msg}, 400
 
 
 @app.post('/membro_base', tags=[membro_tag],
@@ -183,7 +183,7 @@ def obter_membros_comuns(query: MembroComumGetSchema):
 def add_membro_base(form: MembroBaseAddSchema):
     """Adiciona um novo membro à base de dados
 
-    Retorna uma representação dos membros base.
+    Retorna uma verificacao de sucesso ou falha.
     """
     membro = Membro(
       id_base = 0,
@@ -212,12 +212,12 @@ def add_membro_base(form: MembroBaseAddSchema):
        
           
 
-@app.post('/membro_comum_pai', tags=[membro_tag],
+@app.post('/add_membro_comum_pai', tags=[membro_tag],
           responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
 def add_membro_comum_pai(form: MembroAddSchema):
     """Adiciona um novo membro comum à base de dados
 
-    Retorna uma lista de representação dos membros comuns.
+    Retorna uma verificação de sucesso ou falha
     """
     membro = Membro(
       id_base = form.id_base,
@@ -260,10 +260,36 @@ def add_membro_comum_pai(form: MembroAddSchema):
     except Exception as e:
         error_msg = "Não foi possível salvar novo membro comum :/"
         logger.warning(f"Erro ao adicionar membro comum '{membro.nome}', {error_msg}")
-        return {"mesage": error_msg}, 400
+        return {"message": error_msg}, 400
 
 
-@app.post('/membro_comum_mae', tags=[membro_tag],
+@app.put('/altera_membro_comum_pai', tags=[membro_tag],
+          responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
+def altera_membro_comum_pai(form: MembroAlteraPaiSchema):
+    """altera um membro comum na base de dados
+
+       Retorna uma verificação de sucesso ou falha
+    """
+
+    try:
+        session = Session()
+
+        stmt01 = update(Membro).where(Membro.id == form.id_pai).values(nome=form.nome)
+        session.execute(stmt01)
+        session.commit() 
+
+        stmt02 = update(PaiFilho).where(PaiFilho.id_filho == form.id_filho).values(nome_pai=form.nome)
+        session.execute(stmt02)
+        session.commit() 
+
+        return {"sucesso": True}, 200
+    except Exception as e:
+        logger.warning("Erro ao alterar um membro")
+        return {"message": "Erro ao alterar um membro"}, 400
+
+
+
+@app.post('/add_membro_comum_mae', tags=[membro_tag],
           responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
 def add_membro_comum_mae(form: MembroAddSchema):
     """Adiciona um novo membro comum à base de dados
@@ -305,6 +331,30 @@ def add_membro_comum_mae(form: MembroAddSchema):
     except Exception as e:
         error_msg = "Não foi possível salvar novo membro comum :/"
         logger.warning(f"Erro ao adicionar membro comum '{membro.nome}', {error_msg}")
-        return {"mesage": error_msg}, 400
+        return {"message": error_msg}, 400
+
+@app.put('/altera_membro_comum_mae', tags=[membro_tag],
+          responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
+def altera_membro_comum_mae(form: MembroAlteraMaeSchema):
+    """altera um membro comum na base de dados
+
+       Retorna uma verificação de sucesso ou falha
+    """
+
+    try:
+        session = Session()
+
+        stmt01 = update(Membro).where(Membro.id == form.id_mae).values(nome=form.nome)
+        session.execute(stmt01)
+        session.commit() 
+
+        stmt02 = update(MaeFilho).where(MaeFilho.id_filho == form.id_filho).values(nome_mae=form.nome)
+        session.execute(stmt02)
+        session.commit() 
+
+        return {"sucesso": True}, 200
+    except Exception as e:
+        logger.warning("Erro ao alterar um membro")
+        return {"message": "Erro ao alterar um membro"}, 400
 
 
