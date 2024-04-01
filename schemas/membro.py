@@ -41,7 +41,14 @@ class MembroComumGetSchema(BaseModel):
 class MembroGetSchema(BaseModel):
     """ Define o filtro dos membros baseado no id
     """
-    id: int = 1
+    id: int 
+    id_base: int
+
+class MembroGetSchemaId(BaseModel):
+    """ Define o filtro dos membros baseado no id
+    """
+    id: int 
+
 
 class RetornoMembroSchema(BaseModel):
     """ Define com um membro será retornado.

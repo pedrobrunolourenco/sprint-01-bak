@@ -4,7 +4,7 @@ from urllib.parse import unquote
 
 from model.mae_filho import MaeFilho
 from model.pai_filho import PaiFilho
-from schemas.membro import MembroAddSchema, MembroAlteraMaeSchema, MembroAlteraPaiSchema, MembroComumGetSchema, MembroGetSchema, RetornoMembroSchema, RetornoPostEsquema
+from schemas.membro import MembroAddSchema, MembroAlteraMaeSchema, MembroAlteraPaiSchema, MembroComumGetSchema, MembroGetSchema, MembroGetSchemaId, RetornoMembroSchema, RetornoPostEsquema
 from sqlalchemy.exc import IntegrityError
 
 from model import Session, Membro
@@ -19,8 +19,6 @@ from typing import Optional, List
 from model.membro import Membro
 from model.membro_view_model import MembroViewModel
 from sqlalchemy import func, update;
-
-
 
 info = Info(title="API para criação de um MVP de Árvore Genealógica - Sprint-01", version="1.0.0")
 app = OpenAPI(__name__, info=info)
@@ -135,7 +133,7 @@ def obter_membros_base():
     
 @app.get('/membro_por_id', tags=[membro_tag],
           responses={"200": RetornoMembroSchema, "409": ErrorSchema, "400": ErrorSchema, "404": ErrorSchema})
-def obter_por_id(query: MembroGetSchema):
+def obter_por_id(query: MembroGetSchemaId):
     """Obtém um membro 
 
     Retorna uma representação de um membro
@@ -356,5 +354,120 @@ def altera_membro_comum_mae(form: MembroAlteraMaeSchema):
     except Exception as e:
         logger.warning("Erro ao alterar um membro")
         return {"message": "Erro ao alterar um membro"}, 400
+
+@app.get('/membro_pai', tags=[membro_tag],
+          responses={"200": RetornoMembroSchema, "409": ErrorSchema, "400": ErrorSchema, "404": ErrorSchema})
+def obter_membro_pai(query: MembroGetSchemaId):
+    """Obtém um membro 
+
+    Retorna uma representação de um membro
+    """
+    """Obtém um membro 
+
+    Retorna uma representação de um membro
+    """
+    try:
+        session = Session()
+        membro = session.query(Membro).filter(Membro.pai == query.id).first()
+        if membro :
+            retorno = MembroViewModel(id=membro.id, id_base=membro.id_base, nivel=membro.nivel, nome=membro.nome, pai=membro.pai, nome_pai="", mae=membro.mae, nome_mae="")
+            if retorno.pai > 0 :
+                retorno.nome_pai = session.query(Membro).filter(Membro.id == retorno.pai).first().nome
+
+            if retorno.mae > 0 :               
+                retorno.nome_mae = session.query(Membro).filter(Membro.id == retorno.mae).first().nome
+
+            membro_dict = retorno.dict()
+            return {"membro": membro_dict }
+        else :
+          error_msg = "Membro não localizado :/"
+          return {"membro": None}, 200
+        
+    except Exception as e:
+        error_msg = "Não foi possível obter um membro:/"
+        logger.warning(f"Erro ao buscar membro', {error_msg}")
+        return {"message": error_msg}, 400
+
+@app.get('/membro_mae', tags=[membro_tag],
+          responses={"200": RetornoMembroSchema, "409": ErrorSchema, "400": ErrorSchema, "404": ErrorSchema})
+def obter_membro_mae(query: MembroGetSchemaId):
+    """Obtém um membro 
+
+    Retorna uma representação de um membro
+    """
+    try:
+        session = Session()
+        membro = session.query(Membro).filter(Membro.mae == query.id).first()
+        if membro :
+            retorno = MembroViewModel(id=membro.id, id_base=membro.id_base, nivel=membro.nivel, nome=membro.nome, pai=membro.pai, nome_pai="", mae=membro.mae, nome_mae="")
+            if retorno.pai > 0 :
+                retorno.nome_pai = session.query(Membro).filter(Membro.id == retorno.pai).first().nome
+
+            if retorno.mae > 0 :               
+                retorno.nome_mae = session.query(Membro).filter(Membro.id == retorno.mae).first().nome
+
+            membro_dict = retorno.dict()
+            return {"membro": membro_dict }
+        else :
+          error_msg = "Membro não localizado :/"
+          return {"membro": None}, 200
+        
+    except Exception as e:
+        error_msg = "Não foi possível obter um membro:/"
+        logger.warning(f"Erro ao buscar membro', {error_msg}")
+        return {"message": error_msg}, 400
+    
+    
+
+@app.post('/add_membro_comum_filho', tags=[membro_tag],
+          responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
+def add_membro_comum_filho(form: MembroAddSchema):
+    """Adiciona um novo membro comum à base de dados
+
+    Retorna uma verificação de sucesso ou falha
+    """
+    membro = Membro(
+      id_base = form.id_base,
+      nivel = form.nivel,    
+      nome = form.nome,
+      pai = form.pai,
+      mae = form.mae
+    )
+
+    try:
+        session = Session()
+        session.add(membro)
+        session.commit()
+        membro_novo = membro.id
+
+        if membro.pai > 0 :
+          nome_pai = session.query(Membro).filter(Membro.id == form.pai).first().nome
+          paifilho = PaiFilho(
+             id_base = form.id_base,
+             id_filho = membro_novo,
+             nome_pai= nome_pai
+          )
+          pPai = busca_pai_por_id(paifilho.id_filho) 
+          if pPai == "Informe o Pai" :
+              session.add(paifilho)
+              session.commit()
+
+        if membro.mae > 0 :
+          nome_mae = session.query(Membro).filter(Membro.id == form.mae).first().nome
+          maefilho = MaeFilho(
+             id_base = form.id_base,
+             id_filho = membro_novo,
+             nome_mae= nome_mae
+          )
+          pMae = busca_mae_por_id(maefilho.id_filho) 
+          if pPai == "Informe a Mãe" :
+              session.add(maefilho)
+              session.commit()
+
+        return {"sucesso": True}, 200
+    except Exception as e:
+        error_msg = "Não foi possível salvar novo membro comum :/"
+        logger.warning(f"Erro ao adicionar membro comum '{membro.nome}', {error_msg}")
+        return {"message": error_msg}, 400
 
 
