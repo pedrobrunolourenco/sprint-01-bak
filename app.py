@@ -166,7 +166,7 @@ def obter_por_id(query: MembroGetSchemaId):
         logger.warning(f"Erro ao buscar membro por id ', {error_msg}")
         return {"message": error_msg}, 400
         
-@app.get('/membro_comun', tags=[membro_tag],
+@app.get('/membro_comum', tags=[membro_tag],
           responses={"200": ListagemMembrosSchema, "404": ErrorSchema, "400": ErrorSchema})
 def obter_membros_comuns(query: MembroComumGetSchema):
     """Obtém uma lista de membros relacionados a um membro base
