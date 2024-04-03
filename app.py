@@ -1,5 +1,5 @@
 from flask_openapi3 import OpenAPI, Info, Tag
-from flask import redirect
+from flask import redirect, render_template
 from urllib.parse import unquote
 
 from schemas.membro import MembroAddSchema, MembroAlteraFilhoSchema, MembroAlteraMaeSchema, MembroAlteraPaiSchema, MembroComumGetSchema, MembroGetSchema, MembroGetSchemaId, RetornoMembroSchema, RetornoPostEsquema
@@ -403,6 +403,34 @@ def obter_membro_mae(query: MembroGetSchemaId):
         logger.warning(f"Erro ao buscar membro', {error_msg}")
         return {"message": error_msg}, 400
     
+
+@app.post('/add_membro_comum_filho', tags=[membro_tag],
+          responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
+def add_membro_comum_filho(form: MembroAddSchema):
+    """Adiciona um novo membro comum à base de dados
+
+    Retorna uma lista de representação dos membros comuns.
+    """
+    membro = Membro(
+      id_base = form.id_base,
+      nivel = form.nivel,    
+      nome = form.nome,
+      pai = form.pai,
+      mae = form.mae
+    )
+
+    logger.debug(f"Adicionando membro comum de nome: '{membro.nome}'")
+    try:
+        session = Session()
+        session.add(membro)
+        session.commit()
+
+        return {"sucesso": True}, 200
+    except Exception as e:
+        error_msg = "Não foi possível salvar novo membro comum :/"
+        logger.warning(f"Erro ao adicionar membro comum '{membro.nome}', {error_msg}")
+        return {"message": error_msg}, 400
+
 
 @app.put('/altera_membro_comum_filho', tags=[membro_tag],
           responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
