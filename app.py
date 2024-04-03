@@ -2,9 +2,7 @@ from flask_openapi3 import OpenAPI, Info, Tag
 from flask import redirect
 from urllib.parse import unquote
 
-from model.mae_filho import MaeFilho
-from model.pai_filho import PaiFilho
-from schemas.membro import MembroAddSchema, MembroAlteraMaeSchema, MembroAlteraPaiSchema, MembroComumGetSchema, MembroGetSchema, MembroGetSchemaId, RetornoMembroSchema, RetornoPostEsquema
+from schemas.membro import MembroAddSchema, MembroAlteraFilhoSchema, MembroAlteraMaeSchema, MembroAlteraPaiSchema, MembroComumGetSchema, MembroGetSchema, MembroGetSchemaId, RetornoMembroSchema, RetornoPostEsquema
 from sqlalchemy.exc import IntegrityError
 
 from model import Session, Membro
@@ -12,13 +10,15 @@ from logger import logger
 from schemas import *
 from flask_cors import CORS
 
+from sqlalchemy.orm import aliased
+
 
 #######################################
 from pydantic import BaseModel
 from typing import Optional, List
 from model.membro import Membro
 from model.membro_view_model import MembroViewModel
-from sqlalchemy import func, update;
+from sqlalchemy import AliasedReturnsRows, func, update;
 
 info = Info(title="API para criação de um MVP de Árvore Genealógica - Sprint-01", version="1.0.0")
 app = OpenAPI(__name__, info=info)
@@ -41,72 +41,62 @@ def  verifica_se_ja_existe_membro_base(nome: str) -> str :
         logger.warning(e)
             
 
-def busca_pai_por_id(id) -> str :
-    result = "Informe o Pai"
-    if id > 0 :
-        session = Session()
-        membroPai = session.query(PaiFilho).filter(PaiFilho.id_filho == id).first()
-        if membroPai != None and membroPai.id > 0 :
-            result =  membroPai.nome_pai
-        return result
-    else :
-        return result
-    
-def busca_mae_por_id(id) -> str :
-    result = "Informe a Mãe"
-    if id > 0 :
-        session = Session()
-        membroMae = session.query(MaeFilho).filter(MaeFilho.id_filho == id).first()
-        if membroMae != None and membroMae.id > 0 :
-            result =  membroMae.nome_mae
-        return result
-    else :
-        return result
-
 def busca_membros_comuns(id_base) -> List[MembroViewModel] :
     session = Session()    
-    membros = session.query(Membro, PaiFilho, MaeFilho)\
-                    .outerjoin(PaiFilho, Membro.id == PaiFilho.id_filho)\
-                    .outerjoin(MaeFilho, Membro.id == MaeFilho.id_filho)\
-                    .filter((Membro.id_base == id_base) | (Membro.id == id_base))\
-                    .order_by(Membro.nivel, Membro.id)\
-                    .all()
+
+    Pai = aliased(Membro)
+    Mae = aliased(Membro)
+    
+    membros = session.query(Membro, Pai.nome.label('nome_pai'), Mae.nome.label('nome_mae')) \
+                 .outerjoin(Pai, Membro.pai == Pai.id) \
+                 .outerjoin(Mae, Membro.mae == Mae.id) \
+                 .filter((Membro.id_base == id_base) | (Membro.id == id_base)) \
+                 .order_by(Membro.nivel, Membro.id) \
+                 .all()
 
     result = []
-    for membro, pai, mae in membros:
-        result.append({
-            "id": membro.id,    
+    for membro, pai_nome, mae_nome in membros:
+        membro_dict = {
+            "id": membro.id,
             "id_base": membro.id_base,
             "nivel": membro.nivel,
             "nome": membro.nome,
             "pai": membro.pai,
-            "nome_pai": pai.nome_pai if pai else "Informe o Pai",
+            "nome_pai": pai_nome if pai_nome else "Informe o Pai",
             "mae": membro.mae,
-            "nome_mae": mae.nome_mae if mae else "Informe a Mãe"
-        })
+            "nome_mae": mae_nome if mae_nome else "Informe a Mãe"
+        }
+        result.append(membro_dict)
+
     return {"membros": result}
 
 def busca_membros_base() -> List[MembroViewModel] :
-    session = Session()
-    membros = session.query(Membro, PaiFilho, MaeFilho)\
-                    .outerjoin(PaiFilho, Membro.id == PaiFilho.id_filho)\
-                    .outerjoin(MaeFilho, Membro.id == MaeFilho.id_filho)\
-                    .filter(Membro.id_base == 0)\
-                    .order_by(Membro.nivel, Membro.id)\
-                    .all()
+    session = Session()    
+
+    Pai = aliased(Membro)
+    Mae = aliased(Membro)
+    
+    membros = session.query(Membro, Pai.nome.label('nome_pai'), Mae.nome.label('nome_mae')) \
+                 .outerjoin(Pai, Membro.pai == Pai.id) \
+                 .outerjoin(Mae, Membro.mae == Mae.id) \
+                 .filter((Membro.id_base == 0)) \
+                 .order_by(Membro.nivel, Membro.id) \
+                 .all()
 
     result = []
-    for membro, pai, mae in membros:
-        result.append({
-            "id": membro.id,    
+    for membro, pai_nome, mae_nome in membros:
+        membro_dict = {
+            "id": membro.id,
             "id_base": membro.id_base,
             "nivel": membro.nivel,
             "nome": membro.nome,
             "pai": membro.pai,
-            "nome_pai": pai.nome_pai if pai else "Informe o Pai",
+            "nome_pai": pai_nome if pai_nome else "Informe o Pai",
             "mae": membro.mae,
-            "nome_mae": mae.nome_mae if mae else "Informe a Mãe"
-        })
+            "nome_mae": mae_nome if mae_nome else "Informe a Mãe"
+        }
+        result.append(membro_dict)
+
     return {"membros": result}
 
 
@@ -139,27 +129,43 @@ def obter_por_id(query: MembroGetSchemaId):
     Retorna uma representação de um membro
     """
     try:
-        session = Session()
-        membro = session.query(Membro).filter(Membro.id == query.id).first()
-        if membro :
-            retorno = MembroViewModel(id=membro.id, id_base=membro.id_base, nivel=membro.nivel, nome=membro.nome, pai=membro.pai, nome_pai="", mae=membro.mae, nome_mae="")
-            if retorno.pai > 0 :
-                retorno.nome_pai = session.query(Membro).filter(Membro.id == retorno.pai).first().nome
+        session = Session()    
 
-            if retorno.mae > 0 :               
-                retorno.nome_mae = session.query(Membro).filter(Membro.id == retorno.mae).first().nome
-
-            membro_dict = retorno.dict()
-            return {"membro": membro_dict }
-        else :
+        Pai = aliased(Membro)
+        Mae = aliased(Membro)
+        
+        membros = session.query(Membro, Pai.nome.label('nome_pai'), Mae.nome.label('nome_mae')) \
+                    .outerjoin(Pai, Membro.pai == Pai.id) \
+                    .outerjoin(Mae, Membro.mae == Mae.id) \
+                    .filter((Membro.id == query.id)) \
+                    .order_by(Membro.nivel, Membro.id) \
+                    .first()
+        
+        
+        if not membros :
           error_msg = "Membro não localizado :/"
           return {"message": error_msg}, 200
+        
+        result = []
+        membro, pai_nome, mae_nome = membros  # Descompactando a tupla retornada
+        membro_dict = {
+            "id": membro.id,
+            "id_base": membro.id_base,
+            "nivel": membro.nivel,
+            "nome": membro.nome,
+            "pai": membro.pai,
+            "nome_pai": pai_nome if pai_nome else "Informe o Pai",
+            "mae": membro.mae,
+            "nome_mae": mae_nome if mae_nome else "Informe a Mãe"
+        }
+        result.append(membro_dict)
+        return {"membro": result}
         
     except Exception as e:
         error_msg = "Não foi possível obter um membro por id:/"
         logger.warning(f"Erro ao buscar membro por id ', {error_msg}")
         return {"message": error_msg}, 400
-    
+        
 @app.get('/membro_comun', tags=[membro_tag],
           responses={"200": ListagemMembrosSchema, "404": ErrorSchema, "400": ErrorSchema})
 def obter_membros_comuns(query: MembroComumGetSchema):
@@ -192,7 +198,6 @@ def add_membro_base(form: MembroBaseAddSchema):
     )
 
     try:
-        logger.warning(membro.nome)
         if membro.nome != "" :
             jaexiste = verifica_se_ja_existe_membro_base(membro.nome)
             if jaexiste == True :
@@ -225,30 +230,12 @@ def add_membro_comum_pai(form: MembroAddSchema):
       mae = form.mae
     )
 
-    paifilho = PaiFilho(
-        id_base = form.id_base,
-        id_filho = form.id_origem,
-        nome_pai= form.nome
-    )
-
     logger.debug(f"Adicionando membro comum de nome: '{membro.nome}'")
     try:
         session = Session()
         session.add(membro)
         session.commit()
 
-        paifilho = PaiFilho(
-            id_base = form.id_base,
-            id_filho = form.id_origem,
-            nome_pai= form.nome
-        )
-
-        pPai = busca_pai_por_id(paifilho.id_filho)
-        if pPai == "Informe o Pai" :
-            session.add(paifilho)
-            session.commit()
-
-        
         novo_pai = membro.id
         stmt = update(Membro).where(Membro.id == form.id_origem).values(pai=novo_pai)
         session.execute(stmt)
@@ -271,20 +258,13 @@ def altera_membro_comum_pai(form: MembroAlteraPaiSchema):
 
     try:
         session = Session()
-
         stmt01 = update(Membro).where(Membro.id == form.id_pai).values(nome=form.nome)
         session.execute(stmt01)
         session.commit() 
-
-        stmt02 = update(PaiFilho).where(PaiFilho.id_filho == form.id_filho).values(nome_pai=form.nome)
-        session.execute(stmt02)
-        session.commit() 
-
         return {"sucesso": True}, 200
     except Exception as e:
         logger.warning("Erro ao alterar um membro")
         return {"message": "Erro ao alterar um membro"}, 400
-
 
 
 @app.post('/add_membro_comum_mae', tags=[membro_tag],
@@ -308,22 +288,11 @@ def add_membro_comum_mae(form: MembroAddSchema):
         session.add(membro)
         session.commit()
 
-        maefilho = MaeFilho(
-            id_base = form.id_base,
-            id_filho = form.id_origem,
-            nome_mae = form.nome
-        )
-
-
-        pMae = busca_mae_por_id(maefilho.id_filho)
-        if pMae == "Informe a Mãe" :
-            session.add(maefilho)
-            session.commit()
-
         nova_mae = membro.id
         stmt = update(Membro).where(Membro.id == form.id_origem).values(mae=nova_mae)
         session.execute(stmt)
-        session.commit()       
+        session.commit() 
+
 
         return {"sucesso": True}, 200
     except Exception as e:
@@ -338,18 +307,11 @@ def altera_membro_comum_mae(form: MembroAlteraMaeSchema):
 
        Retorna uma verificação de sucesso ou falha
     """
-
     try:
         session = Session()
-
         stmt01 = update(Membro).where(Membro.id == form.id_mae).values(nome=form.nome)
         session.execute(stmt01)
         session.commit() 
-
-        stmt02 = update(MaeFilho).where(MaeFilho.id_filho == form.id_filho).values(nome_mae=form.nome)
-        session.execute(stmt02)
-        session.commit() 
-
         return {"sucesso": True}, 200
     except Exception as e:
         logger.warning("Erro ao alterar um membro")
@@ -367,22 +329,34 @@ def obter_membro_pai(query: MembroGetSchemaId):
     Retorna uma representação de um membro
     """
     try:
-        session = Session()
-        membro = session.query(Membro).filter(Membro.pai == query.id).first()
-        if membro :
-            retorno = MembroViewModel(id=membro.id, id_base=membro.id_base, nivel=membro.nivel, nome=membro.nome, pai=membro.pai, nome_pai="", mae=membro.mae, nome_mae="")
-            if retorno.pai > 0 :
-                retorno.nome_pai = session.query(Membro).filter(Membro.id == retorno.pai).first().nome
-
-            if retorno.mae > 0 :               
-                retorno.nome_mae = session.query(Membro).filter(Membro.id == retorno.mae).first().nome
-
-            membro_dict = retorno.dict()
-            return {"membro": membro_dict }
-        else :
-          error_msg = "Membro não localizado :/"
-          return {"membro": None}, 200
+        session = Session()    
+        Pai = aliased(Membro)
+        Mae = aliased(Membro)
+        membros = session.query(Membro, Pai.nome.label('nome_pai'), Mae.nome.label('nome_mae')) \
+                    .outerjoin(Pai, Membro.pai == Pai.id) \
+                    .outerjoin(Mae, Membro.mae == Mae.id) \
+                    .filter((Membro.pai == query.id)) \
+                    .order_by(Membro.nivel, Membro.id) \
+                    .first()
         
+        if not membros :
+          error_msg = "Membro não localizado :/"
+          return {"message": error_msg}, 200
+        
+        result = []
+        membro, pai_nome, mae_nome = membros  # Descompactando a tupla retornada
+        membro_dict = {
+            "id": membro.id,
+            "id_base": membro.id_base,
+            "nivel": membro.nivel,
+            "nome": membro.nome,
+            "pai": membro.pai,
+            "nome_pai": pai_nome if pai_nome else "Informe o Pai",
+            "mae": membro.mae,
+            "nome_mae": mae_nome if mae_nome else "Informe a Mãe"
+        }
+        result.append(membro_dict)
+        return {"membro": result}
     except Exception as e:
         error_msg = "Não foi possível obter um membro:/"
         logger.warning(f"Erro ao buscar membro', {error_msg}")
@@ -396,27 +370,38 @@ def obter_membro_mae(query: MembroGetSchemaId):
     Retorna uma representação de um membro
     """
     try:
-        session = Session()
-        membro = session.query(Membro).filter(Membro.mae == query.id).first()
-        if membro :
-            retorno = MembroViewModel(id=membro.id, id_base=membro.id_base, nivel=membro.nivel, nome=membro.nome, pai=membro.pai, nome_pai="", mae=membro.mae, nome_mae="")
-            if retorno.pai > 0 :
-                retorno.nome_pai = session.query(Membro).filter(Membro.id == retorno.pai).first().nome
-
-            if retorno.mae > 0 :               
-                retorno.nome_mae = session.query(Membro).filter(Membro.id == retorno.mae).first().nome
-
-            membro_dict = retorno.dict()
-            return {"membro": membro_dict }
-        else :
-          error_msg = "Membro não localizado :/"
-          return {"membro": None}, 200
+        session = Session()    
+        Pai = aliased(Membro)
+        Mae = aliased(Membro)
+        membros = session.query(Membro, Pai.nome.label('nome_pai'), Mae.nome.label('nome_mae')) \
+                    .outerjoin(Pai, Membro.pai == Pai.id) \
+                    .outerjoin(Mae, Membro.mae == Mae.id) \
+                    .filter((Membro.mae == query.id)) \
+                    .order_by(Membro.nivel, Membro.id) \
+                    .first()
         
+        if not membros :
+          error_msg = "Membro não localizado :/"
+          return {"message": error_msg}, 200
+        
+        result = []
+        membro, pai_nome, mae_nome = membros  # Descompactando a tupla retornada
+        membro_dict = {
+            "id": membro.id,
+            "id_base": membro.id_base,
+            "nivel": membro.nivel,
+            "nome": membro.nome,
+            "pai": membro.pai,
+            "nome_pai": pai_nome if pai_nome else "Informe o Pai",
+            "mae": membro.mae,
+            "nome_mae": mae_nome if mae_nome else "Informe a Mãe"
+        }
+        result.append(membro_dict)        
+        return {"membro": result}
     except Exception as e:
         error_msg = "Não foi possível obter um membro:/"
         logger.warning(f"Erro ao buscar membro', {error_msg}")
         return {"message": error_msg}, 400
-    
     
 
 @app.post('/add_membro_comum_filho', tags=[membro_tag],
@@ -438,36 +423,10 @@ def add_membro_comum_filho(form: MembroAddSchema):
         session = Session()
         session.add(membro)
         session.commit()
-        membro_novo = membro.id
-
-        if membro.pai > 0 :
-          nome_pai = session.query(Membro).filter(Membro.id == form.pai).first().nome
-          paifilho = PaiFilho(
-             id_base = form.id_base,
-             id_filho = membro_novo,
-             nome_pai= nome_pai
-          )
-          pPai = busca_pai_por_id(paifilho.id_filho) 
-          if pPai == "Informe o Pai" :
-              session.add(paifilho)
-              session.commit()
-
-        if membro.mae > 0 :
-          nome_mae = session.query(Membro).filter(Membro.id == form.mae).first().nome
-          maefilho = MaeFilho(
-             id_base = form.id_base,
-             id_filho = membro_novo,
-             nome_mae= nome_mae
-          )
-          pMae = busca_mae_por_id(maefilho.id_filho) 
-          if pPai == "Informe a Mãe" :
-              session.add(maefilho)
-              session.commit()
 
         return {"sucesso": True}, 200
     except Exception as e:
         error_msg = "Não foi possível salvar novo membro comum :/"
         logger.warning(f"Erro ao adicionar membro comum '{membro.nome}', {error_msg}")
         return {"message": error_msg}, 400
-
 

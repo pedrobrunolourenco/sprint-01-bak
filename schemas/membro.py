@@ -27,6 +27,12 @@ class MembroAlteraMaeSchema(BaseModel):
     id_filho: int = 0
     nome: str = "Nome da Mãe"
 
+class MembroAlteraFilhoSchema(BaseModel):
+    """ Define como um membro da árvore a ser alterado deve ser representado
+    """
+    id_filho: int = 0
+    nome: str = "Nome"
+
 
 class MembroBaseAddSchema(BaseModel):
     """ Define como um novo membro base da árvore a ser inserido deve ser representado
