@@ -404,29 +404,20 @@ def obter_membro_mae(query: MembroGetSchemaId):
         return {"message": error_msg}, 400
     
 
-@app.post('/add_membro_comum_filho', tags=[membro_tag],
+@app.put('/altera_membro_comum_filho', tags=[membro_tag],
           responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
-def add_membro_comum_filho(form: MembroAddSchema):
-    """Adiciona um novo membro comum à base de dados
+def altera_membro_comum_filho(form: MembroAlteraFilhoSchema):
+    """altera um membro comum na base de dados
 
-    Retorna uma verificação de sucesso ou falha
+       Retorna uma verificação de sucesso ou falha
     """
-    membro = Membro(
-      id_base = form.id_base,
-      nivel = form.nivel,    
-      nome = form.nome,
-      pai = form.pai,
-      mae = form.mae
-    )
 
     try:
         session = Session()
-        session.add(membro)
-        session.commit()
-
+        stmt01 = update(Membro).where(Membro.id == form.id_filho).values(nome=form.nome)
+        session.execute(stmt01)
+        session.commit() 
         return {"sucesso": True}, 200
     except Exception as e:
-        error_msg = "Não foi possível salvar novo membro comum :/"
-        logger.warning(f"Erro ao adicionar membro comum '{membro.nome}', {error_msg}")
-        return {"message": error_msg}, 400
-
+        logger.warning("Erro ao alterar um membro")
+        return {"message": "Erro ao alterar um membro"}, 400
