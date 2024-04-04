@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from model.membro import Membro
 from model.membro_view_model import MembroViewModel
-from sqlalchemy import AliasedReturnsRows, func, update;
+from sqlalchemy import AliasedReturnsRows, delete, func, update;
 
 info = Info(title="API para criação de um MVP de Árvore Genealógica - Sprint-01", version="1.0.0")
 app = OpenAPI(__name__, info=info)
@@ -449,3 +449,49 @@ def altera_membro_comum_filho(form: MembroAlteraFilhoSchema):
     except Exception as e:
         logger.warning("Erro ao alterar um membro")
         return {"message": "Erro ao alterar um membro"}, 400
+    
+@app.delete('/delete_membro_comum', tags=[membro_tag],
+          responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
+def delete_membro_comum(form: MembroGetSchemaId):
+    """deleta um membro comum na base de dados
+
+       Retorna uma verificação de sucesso ou falha
+    """
+    try:
+        session = Session()
+
+        stmt02 = update(Membro).where(Membro.pai == form.id).values(pai=0)
+        session.execute(stmt02)
+
+        stmt03 = update(Membro).where(Membro.mae == form.id).values(mae=0)
+        session.execute(stmt03)
+
+        membro = session.query(Membro).filter_by(id=form.id).first()
+        session.delete(membro)
+        session.commit() 
+
+        return {"sucesso": True}, 200
+    except Exception as e:
+        logger.warning("Erro ao excluir um membro")
+        return {"message": "Erro ao excluir um membro"}, 400
+    
+
+@app.delete('/delete_membro_base', tags=[membro_tag],
+          responses={"200": RetornoPostEsquema, "409": ErrorSchema, "400": ErrorSchema})
+def delete_membro_base(form: MembroGetSchemaId):
+    """deleta a árvore como um todo na base de dados
+
+       Retorna uma verificação de sucesso ou falha
+    """
+    try:
+        session = Session()
+        
+        stmt = delete(Membro).where((Membro.id_base == form.id) | (Membro.id == form.id))
+        session.execute(stmt)
+        
+        session.commit() 
+
+        return {"sucesso": True}, 200
+    except Exception as e:
+        logger.warning("Erro ao excluir uma árvore")
+        return {"message": "Erro ao excluir uma árvore"}, 400
