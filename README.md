@@ -2,15 +2,12 @@
  BackEnd Python para um MVP de Arvore Genealogica
 
 ##
-O objetivo da Api é estruturar uma cadeia hierárquica para uma árvore genealógica,
-através de endpoints GET, POST, PUT e DELETE.
+O objetivo da Api é estruturar uma cadeia hierárquica para uma árvore genealógica;
 
 O projeto foi desenvolvido em Python e banco de dados SQLLite fazendo uso do 
 conhecimento adquirido no curso. Consiste em apenas uma tabela, que faz uso de 
-um AUTO-REELACIONAMENTO, técnica comumente usada em modelagem 
-de dados para estruturar informações hierárquicas ou de árvore,  
-como em uma estrutura de árvore genealógica, organograma de uma empresa, 
-ou categorias em uma hierarquia.
+um AUTO-RELACIONAMENTO, técnica comumente usada em modelagem 
+de dados para estruturar informações hierárquicas ou de árvore.
 
 ## Como executar 
 Será necessário ter todas as libs python listadas no `requirementos.txt` instaladas.
@@ -33,8 +30,4 @@ Para executar a API  basta executar:
 ```
 (env)$ flask run --host 0.0.0.0 --port 5000 --reload
 ```
-para rodar o projeto:
-http://127.0.0.1:5000
-http://10.81.234.195:5000
-
-Abra o [http://localhost:5000/#/](http://localhost:5000/#/) no navegador para verificar o status da API em execução.
+Abra o http://localhost:5000/#/ no navegador para verificar o status da API em execução.
