@@ -28,39 +28,6 @@ CORS(app)
 home_tag = Tag(name="Documentação", description="Seleção de documentação: Swagger, Redoc ou RapiDoc")
 membro_tag = Tag(name="Membro", description="Adição, Edição, visualização e remoção de membros à base")
 
-def  verifica_se_ja_existe_membro_base(nome: str) -> str :
-    session = Session()
-    try :
-        membro = session.query(Membro).filter(func.lower(Membro.nome) == nome.lower(), Membro.id_base == 0).first()
-        if membro :
-          result = True
-        else :
-          result = False          
-        return result
-    except Exception as e:
-        logger.warning(e)
-            
-def verifica_se_ja_existe_membro_base_alteracao(nome: str, id: int) -> str:
-    session = Session()
-    try:
-        Pai = aliased(Membro)
-        Mae = aliased(Membro)
-
-        membro01 = session.query(Membro, Pai.nome.label('nome_pai'), Mae.nome.label('nome_mae')) \
-                    .outerjoin(Pai, Membro.pai == Pai.id) \
-                    .outerjoin(Mae, Membro.mae == Mae.id) \
-                    .filter(func.lower(Membro.nome) == nome.lower(), Membro.id_base == 0, Membro.id != id) \
-                    .first()
-
-        if membro01 :
-          return True
-        else:
-          return False
-    except Exception as e:
-        logger.warning(e)
-
-
-
 def busca_membros_comuns(id_base) -> List[MembroViewModel] :
     session = Session()    
 
@@ -219,16 +186,10 @@ def add_membro_base(form: MembroBaseAddSchema):
 
     try:
         if membro.nome != "" :
-            jaexiste = verifica_se_ja_existe_membro_base(membro.nome)
-            if jaexiste == True :
-                return {"sucesso": False, "mensagem": "Membro já existe na base"}, 404
-            else :            
-                session = Session()
-                session.add(membro)
-                session.commit()
-                return {"sucesso": True, "mensagem": "Membro base cadastrado com sucesso"}, 200
-        else :
-            return {"sucesso": False, "mensagem": "Necessário informar o nome"}, 400
+            session = Session()
+            session.add(membro)
+            session.commit()
+            return {"sucesso": True, "mensagem": "Membro base cadastrado com sucesso"}, 200
 
     except Exception as e:
             return {"sucesso": False, "mensagem": "Erro ao cadastrar membro base"}, 400
@@ -277,15 +238,11 @@ def altera_membro_comum_pai(form: MembroAlteraPaiSchema):
     """
 
     try:
-       jaexiste = verifica_se_ja_existe_membro_base_alteracao(form.nome, form.id_pai)
-       if jaexiste == True :
-          return {"sucesso": False, "mensagem": "Já "}, 404
-       else :            
-          session = Session()
-          stmt01 = update(Membro).where(Membro.id == form.id_pai).values(nome=form.nome)
-          session.execute(stmt01)
-          session.commit() 
-          return {"sucesso": True}, 200
+        session = Session()
+        stmt01 = update(Membro).where(Membro.id == form.id_pai).values(nome=form.nome)
+        session.execute(stmt01)
+        session.commit() 
+        return {"sucesso": True}, 200
     except Exception as e:
         logger.warning("Erro ao alterar um membro")
         return {"message": "Erro ao alterar um membro"}, 400
